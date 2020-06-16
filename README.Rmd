@@ -14,7 +14,7 @@ library(RMark)
 library(readxl)
 source("functions.R")
 
-data2019 <- read_csv("Bjorn_AC_2019_spillningKorr.csv") %>% 
+data2019 <- read_csv("Bjorn_AC_2019_spillningKorrKon.csv") %>% 
   rename(Datum = Funnetdato) %>% 
   mutate(Vecka = lubridate::isoweek(Datum),
          Ar = lubridate::year(Datum)) %>% 
