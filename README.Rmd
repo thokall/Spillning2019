@@ -1,0 +1,33 @@
+---
+title: "Spillning 2019"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(RMark) 
+library(readxl)
+source("functions.R")
+
+data2019 <- read_csv("Bjorn_AC_2019_spillningKorr.csv") %>% 
+  rename(Datum = Funnetdato) %>% 
+  mutate(Vecka = lubridate::isoweek(Datum),
+         Ar = lubridate::year(Datum)) %>% 
+  arrange(Datum) %>% 
+  mutate(Kon = ifelse(is.na(Kon), "Saknas", Kon))
+
+fit2019 <- data2019 %>% 
+  filter(Kon != "Saknas") %>% 
+  process_data() %>% 
+  fit_models()
+
+fit2019 %>% select(-fit) %>% 
+  mutate(model = str_remove_all(model, "~")) %>% 
+  knitr::kable(digits = 2, caption = "Resultat modellering 2019 års data")
+```
+
