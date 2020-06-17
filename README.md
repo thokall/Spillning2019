@@ -7,7 +7,7 @@ library(RMark)
 library(readxl)
 source("functions.R")
 
-data2019 <- read_csv("https://raw.githubusercontent.com/mskoldSU/Spillning2019/master/Bjorn_AC_2019_spillningKorrKon.csv") %>% 
+data2019 <- read_csv("Bjorn_AC_2019_spillningKorrKon.csv") %>% 
   rename(Datum = Funnetdato) %>% 
   mutate(Vecka = lubridate::isoweek(Datum),
          Ar = lubridate::year(Datum)) %>% 
@@ -30,7 +30,7 @@ fit2019 %>% select(-fit) %>%
 | pi(Kon)p(time + mixture)c()f0(Kon) |      2.01 |   234 | (196, 308)    |   282 | (237, 368)    |   516 | (417, 638)    |
 | pi(1)p(time)c()f0(Kon)             |      9.74 |   200 | (185, 221)    |   242 | (225, 266)    |   442 | (413, 473)    |
 | pi(1)p(time + Kon)c()f0(Kon)       |     11.69 |   198 | (183, 223)    |   243 | (225, 271)    |   441 | (412, 472)    |
-| pi(Kon)p(time)c()f0(Kon)           |     11.75 |   200 | (185, 221)    |   242 | (226, 266)    |   442 | (413, 473)    |
-| pi(Kon)p(time + Kon)c()f0(Kon)     |     13.71 |   198 | (183, 223)    |   243 | (225, 270)    |   441 | (412, 472)    |
+| pi(Kon)p(time)c()f0(Kon)           |     11.75 |   200 | (185, 221)    |   242 | (225, 266)    |   442 | (413, 473)    |
+| pi(Kon)p(time + Kon)c()f0(Kon)     |     13.71 |   198 | (183, 222)    |   243 | (225, 271)    |   441 | (412, 472)    |
 
 Resultat modellering 2019 års data
