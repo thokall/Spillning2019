@@ -8,7 +8,7 @@ pretty_ci <- function(l, u, loglin = FALSE){
   }
 }
 
-process_data <- function(data){
+process_data <- function(data, model){
   data %>% group_by(Individ, Kon, Vecka) %>% 
     summarise(n = 1) %>% 
     ungroup() %>% 
@@ -17,35 +17,69 @@ process_data <- function(data){
                 names_from = Vecka, values_from = n, 
                 values_fill = c(n = 0)) %>% 
     unite("ch", -c("Individ", "Kon"), sep = "") %>% 
-    RMark::process.data(model = "FullHet", groups = "Kon")
+    rename(sex = Kon) %>% 
+    RMark::process.data(model = model, groups = "sex")
 }
 
 fit_models <- function(data){
-  p.2 <- list(formula = ~time + mixture, share = TRUE)
-  p.3 <- list(formula = ~time, share = TRUE)
-  p.4 <- list(formula = ~time + Kon, share = TRUE)
-  f0.1 <-  list(formula = ~Kon)
-  pi.1 <- list(formula = ~Kon)
-  pi.2 <- list(formula = ~1)
-  model_list <- create.model.list("FullHet")
-  fitted <- mark.wrapper(model_list, data = data, output = FALSE, silent = TRUE, delete = TRUE)
+  p.time.mixture <- list(formula = ~time + mixture, share = TRUE)
+  p.time <- list(formula = ~time, share = TRUE)
+  p.time.sex <- list(formula = ~time + sex, share = TRUE)
+  pi.1 <- list(formula = ~1)
+  pi.sex <- list(formula = ~sex)
+  f0.sex <-  list(formula = ~sex)
   
-  table <- fitted$model.table %>% rownames_to_column("model_number") %>% 
-    mutate(model_number = as.numeric(model_number),
-           Hanar = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived"]][["N Population Size"]][["estimate"]][1], NA) %>% round(),
-           l = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived"]][["N Population Size"]][["lcl"]][1], NA),
-           u = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived"]][["N Population Size"]][["ucl"]][1], NA),
-           `Intervall han` = pretty_ci(l, u),
-           `Honor` = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived"]][["N Population Size"]][["estimate"]][2], NA) %>% round(),
-           l = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived"]][["N Population Size"]][["lcl"]][2], NA),
-           u = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived"]][["N Population Size"]][["ucl"]][2], NA),
-           `Intervall hon` = pretty_ci(l, u),
-           Total = `Hanar` + `Honor`,
-           tot_var = map_dbl(model_number, ~fitted[[.x]][["results"]][["derived.vcv"]][["N Population Size"]] %>% sum()),
-           l = Total / exp(1.96 * sqrt(log(1 + tot_var / Total^2))),
-           u = Total * exp(1.96 * sqrt(log(1 + tot_var / Total^2))),
-           `Intervall tot` = pretty_ci(l, u),
-           fit = map(model_number, ~fitted[[.x]])) %>% 
-    select(-model_number, -pi, -p, -c, -f0, -tot_var, -npar, -weight, -AICc, -Deviance, -l, -u)
-  as.tibble(table)
+  fit1 <- process_data(data, "FullHet") %>% 
+    RMark::mark(model = "HetClosed", model.parameters = list(pi = pi.1, p = p.time.mixture, f0 = f0.sex), 
+                output = FALSE, silent = TRUE, delete = TRUE)
+  fit2 <- process_data(data, "FullHet") %>% 
+    RMark::mark(model = "HetClosed", model.parameters = list(pi = pi.sex, p = p.time.mixture, f0 = f0.sex), 
+                output = FALSE, silent = TRUE, delete = TRUE)
+  fit3 <- process_data(data, "Closed") %>% 
+    RMark::mark(model = "Closed", model.parameters = list(p = p.time.sex, f0 = f0.sex), 
+                output = FALSE, silent = TRUE, delete = TRUE)
+  fit4 <- process_data(data, "Closed") %>% 
+    RMark::mark(model = "Closed", model.parameters = list(p = p.time, f0 = f0.sex), 
+                output = FALSE, silent = TRUE, delete = TRUE)
+
+  all_fit <- tibble(fit = list(fit1, fit2, fit3, fit4))
+  table <- mutate(all_fit, 
+                  Hanar = map_dbl(fit, ~.x[["results"]][["derived"]][["N Population Size"]][["estimate"]][1] %>% round()),
+                  Honor = map_dbl(fit, ~.x[["results"]][["derived"]][["N Population Size"]][["estimate"]][2] %>% round()),
+                  Total = Hanar + Honor,
+                  l = map_dbl(fit, ~.x[["results"]][["derived"]][["N Population Size"]][["lcl"]][1]),
+                  u = map_dbl(fit, ~.x[["results"]][["derived"]][["N Population Size"]][["ucl"]][1]),
+                  Hanar = paste(Hanar, pretty_ci(l, u)),
+                  l = map_dbl(fit, ~.x[["results"]][["derived"]][["N Population Size"]][["lcl"]][2]),
+                  u = map_dbl(fit, ~.x[["results"]][["derived"]][["N Population Size"]][["ucl"]][2]),
+                  Honor = paste(Honor, pretty_ci(l, u)), 
+                  tot_var = map_dbl(fit, ~.x[["results"]][["derived.vcv"]][["N Population Size"]] %>% sum()),
+                  l = Total / exp(1.96 * sqrt(log(1 + tot_var / Total^2))),
+                  u = Total * exp(1.96 * sqrt(log(1 + tot_var / Total^2))),
+                  Total = paste(Total, pretty_ci(l, u)),
+                  AICc = map_dbl(fit, ~.x[["results"]][["AICc"]]),
+                  dAICc = round(AICc - min(AICc), 1),
+                  model = map_chr(fit, ~.x[["model.name"]] %>% 
+                                    str_remove_all("~|c\\(\\)"))
+  ) %>% select(-l, -u, -AICc) %>% 
+    arrange(dAICc)
+  table
+}
+
+prov_table <- function(data){
+  veckovis <- data %>% 
+    select(Individ, Kon, Vecka) %>% 
+    distinct() %>% 
+    group_by(Individ, Kon) %>% 
+    summarise(n = n()) %>% 
+    ungroup() %>% 
+    group_by(Kon) %>% 
+    summarise(`Antal prov, veckovis sammanslagning` = paste0(sum(n), " (", round(mean(n), 2), ")"))
+  data %>%  group_by(Individ, Kon) %>% 
+    summarise(n = n()) %>% 
+    ungroup() %>% 
+    group_by(Kon) %>% 
+    summarise(`Antal individer` = n(), `Antal prov` = paste0(sum(n), " (", round(mean(n), 2), ")")) %>% 
+    left_join(veckovis, by = "Kon") %>% 
+    rename(`Kön` = Kon)
 }
