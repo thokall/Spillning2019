@@ -1,5 +1,5 @@
 ---
-title: "Spillning 2019"
+title: "Spillningsinventering björn, Västerbottens län 2019"
 output: github_document
 ---
 
@@ -7,27 +7,26 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
+Detta bibliotek innehåller programkod och data som använts för populationsberäkningar av björn, baserat på spillningsinventeringen i Västerbottens län 2019. Koden är skriven i R och anropar programmet [MARK](http://www.phidot.org/software/mark/) genom gränssnittet RMark.
 
 ```{r}
 library(tidyverse)
 library(RMark) 
-library(readxl)
 source("functions.R")
 
-data2019 <- read_csv("Bjorn_AC_2019_spillningKorr.csv") %>% 
+data2019 <- read_csv("Bjorn_AC_2019_spillning_0616.csv") %>% 
   rename(Datum = Funnetdato) %>% 
-  mutate(Vecka = lubridate::isoweek(Datum),
-         Ar = lubridate::year(Datum)) %>% 
+  mutate(Vecka = lubridate::isoweek(Datum)) %>% 
   arrange(Datum) %>% 
   mutate(Kon = ifelse(is.na(Kon), "Saknas", Kon))
 
 fit2019 <- data2019 %>% 
   filter(Kon != "Saknas") %>% 
-  process_data() %>% 
   fit_models()
 
-fit2019 %>% select(-fit) %>% 
-  mutate(model = str_remove_all(model, "~")) %>% 
-  knitr::kable(digits = 2, caption = "Resultat modellering 2019 års data")
+fit2019 %>% 
+  select(Modell = model, dAICc, Hanar,  Honor, Total) %>% 
+  knitr::kable(caption = "Populationsskattningar för undersökta modeller baserat på inventeringen i Västerbottens län 2019. 
+               Modellerna är rangordnade efter Akaikes informationskriterium med den högst rankade modellen överst.")
 ```
 
